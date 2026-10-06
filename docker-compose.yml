@@ -1,0 +1,26 @@
+# Local dev / demo stack: the app plus a real Redis instance, wired
+# together so `docker compose up` gives a fully working copy of the
+# service without installing Python or Redis on your own machine.
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      URLSHORT_REDIS_URL: redis://redis:6379/0
+      URLSHORT_BASE_URL: http://localhost:8000
+      URLSHORT_RATE_LIMIT_REQUESTS: "20"
+      URLSHORT_RATE_LIMIT_WINDOW_SECONDS: "60"
+    depends_on:
+      redis:
+        condition: service_healthy

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # A real Redis instance for the test run - not mocked. The tests
+    # specifically verify behavior (atomicity under concurrency) that a
+    # mock can't meaningfully stand in for.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run test suite (incl. concurrency/race-condition tests)
+        env:
+          URLSHORT_REDIS_URL: redis://localhost:6379/0
+        run: pytest tests/ -v
+
+      - name: Build the Docker image
+        run: docker build -t url-shortener:ci .
